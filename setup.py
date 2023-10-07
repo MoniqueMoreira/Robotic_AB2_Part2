@@ -3,9 +3,10 @@ Inicializa o workspace do robotics toolbox no iPython.
 """
 
 import numpy as np
-
 from roboticstoolbox import ctraj
 from spatialmath import SE3
+from spatialmath.base import *
+from roboticstoolbox import xplot ,ET2, DHRobot, RevoluteDH, PrismaticDH
 
 
 def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -16,9 +17,13 @@ def cross_product(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def rr_robot(L1=1, L2=1):
-    # --- TODO --- #
-    # Creates the RR robot using the DHRobot class #
-    raise NotImplementedError("rr_robot not implemented yet!")
+
+    
+    e1 = RevoluteDH(a = L1)
+    e2 = RevoluteDH(a = L2)
+
+    rob = DHRobot([e1,e2], name = 'RR')
+    return rob
 
 
 def jacobian(q1, q2, L1=1, L2=1):
@@ -56,21 +61,23 @@ def resolved_rate_control_2r():
     rr = rr_robot()
 
     q0 = np.array([-np.pi / 3, np.pi / 2])
+    #print(q0)
 
     TE1 = rr.fkine(q0)
+    #print(TE1)
     TE2 = SE3.Trans(-0.5, 0.5, 0) @ TE1
+    #print(TE2)
 
     t = np.arange(0, 2, 0.02)
+    #print(t)
 
     Ts = ctraj(TE1, TE2, t)
+    #print(Ts)
+    xplot(t, Ts.t, labels="x y z")
+    xplot(t, Ts.rpy("xyz"), labels="roll pitch yaw")
 
     q = np.zeros((len(t), 2))
-
-    # --- TODO --- #
-
-    raise NotImplementedError("resolved_rate_control_2r not implemented yet!")
-
-    # Implement the resolved rate control algorithm (loop in the q vector) #
+    #print(q)
 
     rr.plot(q)
 
