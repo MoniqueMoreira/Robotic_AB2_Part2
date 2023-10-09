@@ -39,21 +39,22 @@ def plots(qs,erro,t):
     plt.title("Junta x Tempo")
     plt.show()
 
-def rr_robot(L1=1, L2=1):
+def rrr_robot(L1=1, L2=1,L3 = 1):
 
     e1 = RevoluteDH(a = L1)
     e2 = RevoluteDH(a = L2)
+    e3 = RevoluteDH(a = L3)
 
-    rob = DHRobot([e1,e2], name = 'RR')
+    rob = DHRobot([e1,e2,e3], name = 'RRR')
     return rob
 
 def trajetoria():
-    rr = rr_robot()
+    rrr = rrr_robot()
 
-    q0 = np.array([-np.pi / 3, np.pi / 2])
+    q0 = np.array([-np.pi/3,np.pi/2,0])
     #print(q0)
 
-    TE1 = rr.fkine(q0)
+    TE1 = rrr.fkine(q0)
     print("Pose inicial:\n" ,TE1)
     TE2 = SE3.Trans(0,-0.5, 0) @ TE1
     print("Pose final:\n", TE2)
@@ -69,11 +70,11 @@ def trajetoria():
     return Ts
 
 
-def resolved_rate_control_2r(L1 = 1,L2=1):
+def resolved_rate_control_3r(L1 = 1,L2=1, L3= 1):
     """
     Resolved rate control for the RR robot.
     """
-    rr = rr_robot()
+    rr = rrr_robot()
    
     Ts = trajetoria()
 
@@ -85,6 +86,7 @@ def resolved_rate_control_2r(L1 = 1,L2=1):
     # Posição inicial do manipulador (ângulos iniciais das juntas)
     theta1 = 0.0
     theta2 = 0.0
+    theta3 = 0.0
 
     erro = []
     qs = []
@@ -95,19 +97,20 @@ def resolved_rate_control_2r(L1 = 1,L2=1):
         #rr.plot(q = [theta1,theta2])
         # Obtenha a posição atual do efetuador
         T = Ts[i]
-        print(T.t)
+        #print(T)
         x = T.t[0]
         y = T.t[1]
-
-        #print(x,y)
+        wz = T.angvec()[0]
+        #print(wz)
 
         # Calcule o erro cartesiano
-        error_x = x - (L1 * np.cos(theta1) + L2 * np.cos(theta1 + theta2))
-        error_y = y - (L1 * np.sin(theta1) + L2 * np.sin(theta1 + theta2))
+        error_x = x - (L1 * np.cos(theta1) + L2 * np.cos(theta1 + theta2) + L3 * np.cos(theta1 + theta2 +  theta3))
+        error_y = y - (L1 * np.sin(theta1) + L2 * np.sin(theta1 + theta2) + L3 * np.sin(theta1 + theta2 +  theta3))
+        erro_wz = wz -  np.cos(theta1 + theta2 +  theta3)
+        #print(erro_wz)
 
         # Calcule as velocidades das juntas usando a matriz Jacobiana
-        J = np.array([[-L1*np.sin(theta1) - L2*np.sin(theta1 + theta2),-L2*np.sin(theta1 + theta2)],
-                      [L1*np.cos(theta1) + L2*np.cos(theta1 + theta2),L2*np.cos(theta1 + theta2)]])
+        J = np.array([[-L1*np.sin(theta1) -L2*np.sin(theta1 + theta2) -L3*np.sin(theta1 + theta2 + theta3) ,-L2*np.sin(theta1 + theta2) -L3*np.sin(theta1 + theta2 + theta3) , -L3*np.sin(theta1 + theta2 + theta3)],[L1*np.cos(theta1) + L2*np.cos(theta1 + theta2) +L3*np.cos(theta1 + theta2 + theta3),L2*np.cos(theta1 + theta2) +L3*np.cos(theta1 + theta2 + theta3),L3*np.cos(theta1 + theta2 + theta3)],[1,1,1]])
         #print(J)
         #print(jsingu(J))
 
@@ -116,17 +119,18 @@ def resolved_rate_control_2r(L1 = 1,L2=1):
         if abs(determinant) < 1e-6:
             lambda_value = 0.01 # Ajuste este valor conforme necessário
             J_reg = J + lambda_value * np.identity(J.shape[0])
-            joint_velocities = np.linalg.solve(J_reg, np.array([error_x, error_y]))
+            joint_velocities = np.linalg.solve(J_reg, np.array([error_x, error_y, erro_wz]))
 
         else:
             # Resolver o sistema normalmente.
-            joint_velocities = np.linalg.solve(J, np.array([error_x, error_y]))
+            joint_velocities = np.linalg.solve(J, np.array([error_x, error_y, erro_wz]))
 
         # Atualize os ângulos das juntas
         theta1 += joint_velocities[0] * dt
         theta2 += joint_velocities[1] * dt
+        theta3 += joint_velocities[2] * dt
 
-        q = [theta1,theta2]
+        q = [theta1,theta2,theta3]
         qs.append(q)
         #rr.plot(q)
 
@@ -138,12 +142,12 @@ def resolved_rate_control_2r(L1 = 1,L2=1):
         # Aguarde um tempo para a próxima iteração
         time.sleep(dt)
 
-    print("q = {}".format([theta1,theta2]))
+    print("q = {}".format([theta1,theta2,theta3]))
     #print(np.rad2deg(theta1), np.rad2deg(theta2))
 
-    rr.teach([theta1,theta2])
+    rr.teach(q)
     plots(qs,erro,t)
     
 
 def main():
-    resolved_rate_control_2r()
+    resolved_rate_control_3r()
